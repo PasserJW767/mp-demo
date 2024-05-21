@@ -1,7 +1,9 @@
 package com.itheima.mp.mapper;
 
 import com.baomidou.mybatisplus.core.conditions.Wrapper;
+import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
+import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import com.baomidou.mybatisplus.core.conditions.update.UpdateWrapper;
 import com.itheima.mp.domain.po.User;
 import org.junit.jupiter.api.Test;
@@ -69,7 +71,12 @@ class UserMapperTest {
                 .like("username", "o")
                 .ge("balance", 1000);
 
-        List<User> users = userMapper.selectList(wrapper);
+        LambdaQueryWrapper<User> wrapper2 = new LambdaQueryWrapper<User>()
+                .select(User::getId, User::getUsername, User::getInfo, User::getBalance)
+                .like(User::getUsername, "o")
+                .ge(User::getBalance, 1000);
+
+        List<User> users = userMapper.selectList(wrapper2);
         System.out.println(users);
     }
 
@@ -108,6 +115,25 @@ class UserMapperTest {
                 .in("id", ids);
 
         userMapper.update(null, userUpdateWrapper);
+    }
+
+    @Test
+    void testUpdateCustomSql(){
+//        更新id为 1,2,4 的⽤⼾的余额，扣200
+//        UPDATE user SET balance = balance - 200 WHERE id in (1, 2, 4)
+//        假设这是业务层，不推荐将Sql语句写在业务层
+
+//        1. 获得前端传来的ids
+        List<Long> ids = List.of(1L, 2L, 4L);
+
+//        2. 通过Wrapper指定具体的查询条件
+        LambdaUpdateWrapper<User> userLambdaUpdateWrapper = new LambdaUpdateWrapper<User>().in(User::getId, ids);
+
+//        UpdateWrapper<User> userQueryWrapper = new UpdateWrapper<User>().in("id", ids);
+
+//        3. 根据定义的语句查询
+        userMapper.deductBalanceAccordingIds(10, userLambdaUpdateWrapper);
+
     }
 
 }
