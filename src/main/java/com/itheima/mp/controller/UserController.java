@@ -48,12 +48,21 @@ public class UserController {
     }
 
     @ApiOperation("根据id批量查询用户接口")
-    @GetMapping("{id}")
+    @GetMapping("/users}")
     public List<UserVO> queryUserByIds(@ApiParam("用户id集合") @RequestParam("ids") List<Long> ids){
 //        1. 查询用户PO
         List<User> users = userService.listByIds(ids);
 //        2. 把PO拷贝到VO
         return BeanUtil.copyToList(users, UserVO.class);
+    }
+
+    @ApiOperation("根据id扣减用户对应账户的余额")
+    @PutMapping("{id}/deduction/{money}")
+    public void deductBalance(
+            @ApiParam("用户id") @PathVariable("id") Long id,
+            @ApiParam("扣减量") @PathVariable("money") Integer money
+    ){
+        userService.deductMoney(id, money);
     }
 
 }

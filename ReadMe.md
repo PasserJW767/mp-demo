@@ -64,11 +64,24 @@ LambdaQueryWrapper<User> userLambdaQueryWrapper = new QueryWrapper<User>()
         .lambda();
 ```
 
-# 5. IService接口的使用
+# 5. IService接口
+## 5.1 IService接口的使用
 在`src/main/java/com/itheima/mp/service/IUserService.java`接口下继承IService
 
 在`src/main/java/com/itheima/mp/service/impl/UserServiceImpl.java`下继承ServiceImpl<UserMapper, User>，其中第一个类是Mapper类，第二个是对应的实体类，这个类里边实现了IService要求的许多方法，接着实现IUserService
 
 测试CRUD见`src/test/java/com/itheima/mp/service/UserServiceTest.java`
 
+## 5.2 IService做简单业务开发
 在Controller做基础业务开发见`src/main/java/com/itheima/mp/controller/UserController.java`
+
+## 5.3 IService做复杂业务开发
+在Controller做复杂业务开发见`src/main/java/com/itheima/mp/controller/UserController.java`下的`deductBalance`
+
+在这部分中主要就是在业务层对用户合法性进行校验，并对余额进行检查
+
+对于Mapper中之前会使用的`${ew.customSqlSegment}`，简单的条件可以不使用wrapper来实现，复杂的条件比如`id in (ids)`这些需要使用一些循环来写的，才需要使用wrapper，简单的可以自己手写
+
+在这个开发过程中，遇到的问题包括：
+1. 请求参数如果是单个参数不可以使用`@RequestParam`，否则会报错无法解析条件的问题：`Required request parameter 'id' for method parameter type long is not presen...`
+2. 使用swapper时记得将参数勾选上，如果勾选上提示`Request method 'PUT' not supported`的话，可以检查前后端的请求和规定链接是否一致

@@ -19,4 +19,7 @@ public interface UserMapper extends BaseMapper<User> {
 
     @Select("select u.* from tb_user u inner join address a on u.id = a.user_id ${ew.customSqlSegment}")
     List<User> testQueryMultiTable(@Param("ew") QueryWrapper<User> queryWrapper);
+
+    @Update("update tb_user set balance = balance - #{money} where id = #{id}")
+    void deductMoney(Long id, Integer money);
 }
