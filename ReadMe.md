@@ -63,3 +63,10 @@ LambdaQueryWrapper<User> userLambdaQueryWrapper = new QueryWrapper<User>()
         .eq("a.city", "北京")
         .lambda();
 ```
+
+# 5. IService接口的使用
+在`src/main/java/com/itheima/mp/service/IUserService.java`接口下继承IService
+
+在`src/main/java/com/itheima/mp/service/impl/UserServiceImpl.java`下继承ServiceImpl<UserMapper, User>，其中第一个类是Mapper类，第二个是对应的实体类，这个类里边实现了IService要求的许多方法，接着实现IUserService
+
+测试CRUD见`src/test/java/com/itheima/mp/service/UserServiceTest.java`
