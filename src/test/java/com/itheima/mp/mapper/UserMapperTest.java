@@ -1,10 +1,10 @@
 package com.itheima.mp.mapper;
 
-import com.baomidou.mybatisplus.core.conditions.Wrapper;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import com.baomidou.mybatisplus.core.conditions.update.UpdateWrapper;
+import com.itheima.mp.domain.po.Address;
 import com.itheima.mp.domain.po.User;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -133,6 +133,30 @@ class UserMapperTest {
 
 //        3. 根据定义的语句查询
         userMapper.deductBalanceAccordingIds(10, userLambdaUpdateWrapper);
+    }
+
+    @Test
+    void testQueryMultiTable(){
+//        多表查询，选择id为1、2、4中住在北京的人的信息
+//        select *
+//        from user u inner join address a on u.id=a.id
+//        where i.id in ids and a.city = "北京"
+
+        List<Long> ids = List.of(1L, 2L, 4L);
+
+        QueryWrapper<User> queryWrapper = new QueryWrapper<User>()
+                .in("u.id", ids)
+                .eq("a.city", "北京");
+
+//        方法二，转为lambda
+        LambdaQueryWrapper<User> userLambdaQueryWrapper = new QueryWrapper<User>()
+                .in("u.id", ids)
+                .eq("a.city", "北京")
+                .lambda();
+
+        List<User> users = userMapper.testQueryMultiTable(queryWrapper);
+
+        users.forEach(System.out::println);
 
     }
 

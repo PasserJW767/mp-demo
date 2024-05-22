@@ -44,3 +44,22 @@ User::getBalance
 通过Wrapper自定义条件，并将参数传入到自己自定义的语句中
 
 在自己自定义的语句中通过`@Param("ew")`来指明wrapper对象（这个是固定的！），通过其他名字来指定传入的参数
+
+## 4.1 自定义Sql用于多表查询
+
+见`src/test/java/com/itheima/mp/MpDemoApplicationTests.java`下的`testQueryMultiTable`
+
+我尝试使用LambdaQueryWrapper，但是好像并不好使，在定义：
+```java
+LambdaQueryWrapper<User> users = new LambdaQueryWrapper<User>
+        .in(User::getId, List.of(1L, 2L, 4L))
+        .eq(Address::getCity, "北京") // 这里会出问题，因为上面定义了类是User，这里好像找不到这个getCity方法
+```
+
+但是可以通过`.lambda`转换：
+```java
+LambdaQueryWrapper<User> userLambdaQueryWrapper = new QueryWrapper<User>()
+        .in("u.id", ids)
+        .eq("a.city", "北京")
+        .lambda();
+```
