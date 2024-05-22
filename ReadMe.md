@@ -70,3 +70,5 @@ LambdaQueryWrapper<User> userLambdaQueryWrapper = new QueryWrapper<User>()
 在`src/main/java/com/itheima/mp/service/impl/UserServiceImpl.java`下继承ServiceImpl<UserMapper, User>，其中第一个类是Mapper类，第二个是对应的实体类，这个类里边实现了IService要求的许多方法，接着实现IUserService
 
 测试CRUD见`src/test/java/com/itheima/mp/service/UserServiceTest.java`
+
+在Controller做基础业务开发见`src/main/java/com/itheima/mp/controller/UserController.java`
