@@ -98,3 +98,46 @@ lambda适用于一些原本需要再Mapper.xml中写的一些判断语句，如�
     AND userName LIKE #{name}
 </if>
 ```
+
+## 5.5 IService中的批量新增
+做批量新增的三种方案：
+1. 普通for循环逐条插入，速度很慢，不推荐（因为一条语句要发送一个网络请求）
+2. MP的批量新增，基于预编译的批处理，性能不错（MP会将所有的插入请求打包起来，比如1000条打包一份，一次网络请求发送1000条插入语句）
+3. 配置JDBC参数，开启rewriteBatchedStatements，性能最好（这会将所有的请求转换成一条Sql语句进行执行，效率最高）
+
+对于第一种方案：
+```java
+void testsaveOneByone(){
+    long b = system.currentTimeMillis();
+    for(int i=1;i<=100000;i++){
+        userService.save(buildUser(i));
+    };
+    long e = system.currentTimeMillis();
+    System.out.println("耗时:"+(e- b));
+}
+```
+
+对于第二种方案：
+```java
+    // 准备一个容量为1000的集合
+    List<User> list = new ArrayList<>(1000);
+    long b = system.currentTimeMillis();
+    
+    for (int i = 1; i <= 100000; i++){
+        // 向集合中加入新用户
+        list.add(builderUser(i));
+        if (i % 1000 == 0){
+            // 发送一次网络请求
+            userService.saveBatch(list);
+            // 清空集合
+            list.clear();
+        }
+    }
+    
+    long e = system.currentTimeMillis();
+    System.out.println("耗时:"+(e- b));
+```
+
+对于第三种方案：
+
+在第二种方案的基础上只需要在`application.yml`后拼接一个参数：`rewriteBatchedStatements=True`即可。
