@@ -85,3 +85,16 @@ LambdaQueryWrapper<User> userLambdaQueryWrapper = new QueryWrapper<User>()
 在这个开发过程中，遇到的问题包括：
 1. 请求参数如果是单个参数不可以使用`@RequestParam`，否则会报错无法解析条件的问题：`Required request parameter 'id' for method parameter type long is not presen...`
 2. 使用swapper时记得将参数勾选上，如果勾选上提示`Request method 'PUT' not supported`的话，可以检查前后端的请求和规定链接是否一致
+
+## 5.4 IService的Lambda方法
+在`src/main/java/com/itheima/mp/controller/UserController.java`下的复杂条件查询方法`queryUsers`就使用了Lambda查询
+
+同时在`src/main/java/com/itheima/mp/service/impl/UserServiceImpl.java`中的`deductMoney`也给出了更新余额的Lambda实现形式，
+在这种实现形式中还使用了乐观锁来保证有多个线程访问同一个用户的方法时不会出现问题。
+
+lambda适用于一些原本需要再Mapper.xml中写的一些判断语句，如：
+```xml
+<if test="name != null">
+    AND userName LIKE #{name}
+</if>
+```

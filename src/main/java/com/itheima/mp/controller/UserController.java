@@ -3,6 +3,7 @@ package com.itheima.mp.controller;
 import cn.hutool.core.bean.BeanUtil;
 import com.itheima.mp.domain.dto.UserFormDTO;
 import com.itheima.mp.domain.po.User;
+import com.itheima.mp.domain.query.UserQuery;
 import com.itheima.mp.domain.vo.UserVO;
 import com.itheima.mp.service.IUserService;
 import io.swagger.annotations.Api;
@@ -63,6 +64,13 @@ public class UserController {
             @ApiParam("扣减量") @PathVariable("money") Integer money
     ){
         userService.deductMoney(id, money);
+    }
+
+    @ApiOperation("根据指定复杂条件查询用户列表")
+    @GetMapping("/lists")
+    public List<UserVO> queryUsers(UserQuery userQuery){
+        List<User> userList = userService.queryUsers(userQuery.getName(), userQuery.getStatus(), userQuery.getMinBalance(), userQuery.getMaxBalance());
+        return BeanUtil.copyToList(userList, UserVO.class);
     }
 
 }
