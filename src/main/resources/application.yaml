@@ -11,6 +11,12 @@ logging:
     dateformat: HH:mm:ss
 mybatis:
   mapper-locations: classpath*:mapper/*.xml
+mybatis-plus:
+  global-config:
+    db-config:
+      logic-delete-field: deleted # 配置逻辑删除字段
+      logic-delete-value: 1
+      logic-not-delete-value: 0
 knife4j:
   enable: true
   openapi:
