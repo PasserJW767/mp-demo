@@ -49,7 +49,7 @@ public class UserController {
     }
 
     @ApiOperation("根据id批量查询用户接口")
-    @GetMapping("/users}")
+    @GetMapping("/users")
     public List<UserVO> queryUserByIds(@ApiParam("用户id集合") @RequestParam("ids") List<Long> ids){
 //        1. 查询用户PO
         List<User> users = userService.listByIds(ids);
@@ -71,6 +71,18 @@ public class UserController {
     public List<UserVO> queryUsers(UserQuery userQuery){
         List<User> userList = userService.queryUsers(userQuery.getName(), userQuery.getStatus(), userQuery.getMinBalance(), userQuery.getMaxBalance());
         return BeanUtil.copyToList(userList, UserVO.class);
+    }
+
+    @ApiOperation("查询用户同时查询其对应地址信息接口")
+    @GetMapping("/useraddress/{id}")
+    public UserVO queryUserAndAddressById(@ApiParam("用户id") @PathVariable("id") Long id) {
+        return userService.queryUserAndAddressById(id);
+    }
+
+    @ApiOperation("根据id批量查询用户及其地址接口")
+    @GetMapping("/batchusers")
+    public List<UserVO> queryUserAndAddressByIds(@ApiParam("用户id集合") @RequestParam("ids") List<Long> ids){
+        return userService.queryBatchUserAndAddressByIds(ids);
     }
 
 }

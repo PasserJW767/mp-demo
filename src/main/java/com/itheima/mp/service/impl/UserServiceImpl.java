@@ -1,13 +1,20 @@
 package com.itheima.mp.service.impl;
 
+import cn.hutool.core.bean.BeanUtil;
+import cn.hutool.core.collection.CollUtil;
 import com.baomidou.mybatisplus.extension.conditions.query.LambdaQueryChainWrapper;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
+import com.baomidou.mybatisplus.extension.toolkit.Db;
+import com.itheima.mp.domain.po.Address;
 import com.itheima.mp.domain.po.User;
+import com.itheima.mp.domain.vo.AddressVO;
+import com.itheima.mp.domain.vo.UserVO;
 import com.itheima.mp.mapper.UserMapper;
 import com.itheima.mp.service.IUserService;
 import org.springframework.stereotype.Service;
 
-import java.util.List;
+import java.util.*;
+import java.util.stream.Collectors;
 
 @Service
 public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements IUserService {
@@ -46,5 +53,60 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements IU
                 .gt(minBalance != null, User::getBalance, minBalance)
                 .lt(maxBalance != null, User::getBalance, maxBalance)
                 .list();
+    }
+
+    @Override
+    public UserVO queryUserAndAddressById(Long id) {
+//        1. 查询用户
+        User user = baseMapper.selectById(id);
+        if (user == null || user.getStatus() == 2)
+            throw new RuntimeException("用户不存在或账号被冻结！");
+        // 封装用户VO
+        UserVO userVO = BeanUtil.copyProperties(user, UserVO.class);
+//        2. 用户存在则查询地址
+        List<Address> list = Db.lambdaQuery(Address.class)
+                .eq(Address::getUserId, id).list();
+        System.out.println(list);
+        // 若地址列表不为空则封装地址VO
+        if (!list.isEmpty()){
+            List<AddressVO> addressVOS = BeanUtil.copyToList(list, AddressVO.class);
+            userVO.setAddress(addressVOS);
+        }
+
+        return userVO;
+    }
+
+    @Override
+    public List<UserVO> queryBatchUserAndAddressByIds(List<Long> ids) {
+//        1. 先批量查询用户
+        List<User> users = baseMapper.selectBatchIds(ids);
+        if (CollUtil.isEmpty(users)){
+            return Collections.emptyList();
+        }
+
+//        2. 使用in语句来批量查询
+//        根据查询的用户，获取用户id集合（不用ids的原因是，可能有的ids是不存在的）
+        List<Long> userIds = users.stream().map(User::getId).collect(Collectors.toList());
+//        再根据这些Id查询用户地址 -> in语句查询
+        List<Address> addresses = Db.lambdaQuery(Address.class).in(Address::getUserId, userIds).list();
+//        转换成AddressVO
+        List<AddressVO> addressVOList = BeanUtil.copyToList(addresses, AddressVO.class);
+
+//        用户地址分集合处理，同一个用户的地址放入一个集合中，HashMap的Key是用户ID，Value是用户对应的地址集合
+        Map<Long, List<AddressVO>> addressMap = new HashMap<>();
+        if (CollUtil.isNotEmpty(addressVOList)){
+            addressMap = addressVOList.stream().collect(Collectors.groupingBy(AddressVO::getUserId));
+        }
+
+//        3. 转换VO返回
+        List<UserVO> list = new ArrayList<>();
+        for (User user : users){
+//            转换成UserVO
+            UserVO userVO = BeanUtil.copyProperties(user, UserVO.class);
+            userVO.setAddress(addressMap.get(userVO.getId()));
+            list.add(userVO);
+        }
+
+        return list;
     }
 }
