@@ -229,7 +229,6 @@ mybatis-plus:
 2. `@JsonValue`，表明返回时显示哪个属性的值，若不备注默认显示上边的`NORMAL/FROZEN`，可能导致可读性不强的问题
 
 # 9. JSON处理器
-## 9.1 为什么需要JSON处理器？
 在数据库表中，`User`有一个`info`属性，里面是以Json格式保存了用户的`age&intro&gender`信息，目前是以字符串的形式处理的
 
 如果给用户返回这样的格式可能不易于读取和理解
@@ -237,4 +236,18 @@ mybatis-plus:
 `MP`为我们提供了将数据库中的这种字符串转换为Json格式的处理方法，步骤如下：
 1. 新建一个JSON格式对应的实体，如`domain/po/UserInfo`
 2. 在原本的`User`实体上对应的字段加上处理器，并在类上允许自动映射，见`domain/po/User`
-3. 
+
+# 10. MP提供的分页插件
+## 10.1 分页查询配置
+见`config/MyBatisConfig.java`，里面的核心实际上是注册了一个拦截器，在MyBatis执行SQL语句查询的时候进行拦截并进行分页处理
+
+## 10.2 分页测试
+见`test/.../service/UserServiceTest.java`中的`testPageQuery`方法，步骤分为：
+1. 准备分页插件，这个过程需要指定查询的页数`pageNo`和每一页的大小`pageSize`
+2. 指定具体排序条件，按什么字段进行排序
+3. 进行查询，得到`Page`对象
+4. 通过对象拿到结果：
+    - `p.getTotal`：查询总条数
+    - `p.getPages`：查询总页数
+    - `p.getRecords`：拿到刚才指定`pageNo`那一页的结果
+
