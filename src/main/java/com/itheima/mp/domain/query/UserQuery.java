@@ -6,7 +6,7 @@ import lombok.Data;
 
 @Data
 @ApiModel(description = "用户查询条件实体")
-public class UserQuery {
+public class UserQuery extends PageQuery {
     @ApiModelProperty("用户名关键字")
     private String name;
     @ApiModelProperty("用户状态：1-正常，2-冻结")

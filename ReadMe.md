@@ -251,3 +251,31 @@ mybatis-plus:
     - `p.getPages`：查询总页数
     - `p.getRecords`：拿到刚才指定`pageNo`那一页的结果
 
+## 10.3 分页案例1
+![pic1.png](assets/pic1.png)
+
+之前已经定义过了一个让用户选择对应条件进行查询的类，即`domain/query/UserQuery`
+
+这里多加了一个分页，即前端可能通过分页实现，用户可以选择每页选择多少条，以及看第几页，这时候就表示用户可以传入一些额外的属性如：
+- 页码
+- 每页数据条数
+- 排序字段
+- 升序/降序排序
+
+这些查询条件除了在开发User业务类的时候可能会用到，可能在开发Address等其他业务类的时候可能也会用到，所以这里定义一个统一的页数查询：`domain/query/PageQuery`
+，接着让原本的`UserQuery`去继承`PageQuery`即可获得其属性，便于分页和不分页时候的处理
+
+定义好了输入，就要定义输出，返回的结果除了用户希望看到的结果`List<UserVO>`外，由于我们是分页查询，应该还包括一些页数的信息如：
+- 数据总条数
+- 当前页数
+- 当前页的数据`List<UserVO>`
+
+因此定义了`domain/dto/PageDTO`，其中的`list`可以指定对应的类型。我们在返回具体类型时候指定泛型就可以了。
+
+执行的流程是：
+1. 根据`Page.of()`定义当前页和分页的大小
+2. 根据`UserQuery`中的条件来定义`Page`的排序规则：`page.addOrder(new OrderItem(字段名,是否升序))`
+3. 使用`lambdaQuery`，根据`UserQuery`中传入的条件进行查询，最后不接`list()`,接`page(page)`
+4. 第三步得到一个`Page<User>`对象，使用`CollUtil`来判空
+5. 建立返回的类型`PageDTO<UserVO>`对象，并将`Page<User>`中的一些`total&page`属性设置进去
+6. 给`PageDTO<UserVO>`set List为`BeanUtil.copyToList(Page<User>.getRecord(), UserVO.class)`

@@ -1,6 +1,8 @@
 package com.itheima.mp.controller;
 
 import cn.hutool.core.bean.BeanUtil;
+import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
+import com.itheima.mp.domain.dto.PageDTO;
 import com.itheima.mp.domain.dto.UserFormDTO;
 import com.itheima.mp.domain.po.User;
 import com.itheima.mp.domain.query.UserQuery;
@@ -83,6 +85,12 @@ public class UserController {
     @GetMapping("/batchusers")
     public List<UserVO> queryUserAndAddressByIds(@ApiParam("用户id集合") @RequestParam("ids") List<Long> ids){
         return userService.queryBatchUserAndAddressByIds(ids);
+    }
+
+    @ApiOperation("以分页形式根据指定条件查询用户信息")
+    @GetMapping("/page")
+    public PageDTO<UserVO> queryUsersPage(UserQuery query){
+        return userService.queryUserPage(query);
     }
 
 }
