@@ -9,6 +9,7 @@ import com.itheima.mp.domain.po.Address;
 import com.itheima.mp.domain.po.User;
 import com.itheima.mp.domain.vo.AddressVO;
 import com.itheima.mp.domain.vo.UserVO;
+import com.itheima.mp.enums.UserStatus;
 import com.itheima.mp.mapper.UserMapper;
 import com.itheima.mp.service.IUserService;
 import org.springframework.stereotype.Service;
@@ -22,7 +23,7 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements IU
     public void deductMoney(Long id, Integer money) {
 //        1. 校验用户账户合法性
         User user = baseMapper.selectById(id);
-        if (user == null || user.getStatus() == 2){
+        if (user == null || user.getStatus() == UserStatus.FROZEN){
             throw new RuntimeException("用户状态异常");
         }
 //        2. 校验用户余额是否大于扣减数量
@@ -39,7 +40,7 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements IU
         int result_balance = user.getBalance() - money;
         lambdaUpdate()
                 .set(User::getBalance, result_balance)
-                .set(result_balance == 0, User::getStatus, 0)
+                .set(result_balance == 0, User::getStatus, UserStatus.FROZEN)
                 .eq(User::getId, id)
                 .eq(User::getBalance, user.getBalance()) // 乐观锁（Compare and Set），保证当一个用户有两个线程在访问同一个方法时候，不会出现问题。即用户更新余额时，要求数据库的余额和当初拿到的余额相等
                 .update();
@@ -59,7 +60,7 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements IU
     public UserVO queryUserAndAddressById(Long id) {
 //        1. 查询用户
         User user = baseMapper.selectById(id);
-        if (user == null || user.getStatus() == 2)
+        if (user == null || user.getStatus() == UserStatus.FROZEN)
             throw new RuntimeException("用户不存在或账号被冻结！");
         // 封装用户VO
         UserVO userVO = BeanUtil.copyProperties(user, UserVO.class);

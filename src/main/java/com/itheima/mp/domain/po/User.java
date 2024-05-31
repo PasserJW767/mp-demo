@@ -4,6 +4,7 @@ import com.baomidou.mybatisplus.annotation.IdType;
 import com.baomidou.mybatisplus.annotation.TableField;
 import com.baomidou.mybatisplus.annotation.TableId;
 import com.baomidou.mybatisplus.annotation.TableName;
+import com.itheima.mp.enums.UserStatus;
 import lombok.Data;
 
 import java.time.LocalDateTime;
@@ -42,7 +43,7 @@ public class User {
     /**
      * 使用状态（1正常 2冻结）
      */
-    private Integer status;
+    private UserStatus status;
 
     /**
      * 账户余额

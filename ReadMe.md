@@ -141,3 +141,89 @@ void testsaveOneByone(){
 对于第三种方案：
 
 在第二种方案的基础上只需要在`application.yml`后拼接一个参数：`rewriteBatchedStatements=True`即可。
+
+# 6. DB静态工具
+## 6.1 为什么需要DB静态工具？
+思考一个场景：查询用户时，我们需要同时返回用户的地址信息
+
+在这种情况下，我们可能还需要在`UserService`业务类中额外地加入如`AddressService`或者`AddressMapper`等`User`无关的内容，
+假如说加入的是`AddressService`，未来`AddressService`又依赖于`UserService`，就会导致循环依赖的问题。
+
+虽然Spring能够处理好循环依赖，但是我们应当尽量避免循环依赖的出现，这时候就需要使用DB静态工具
+
+## 6.2 案例一：给定用户id，查询用户时同时查询用户地址
+对应于`service/impl/UserServiceImpl.java`下的`queryUserAndAddressById`方法
+
+步骤：
+1. 给`UserVO`新建一个`List<AddressVO> addresses`属性，用于存放用户地址（因为这个属性只是面向输出的，我们不需要在po里面加，只需要在面向输出的实体中加即可）
+2. 根据给定的用户id查询用户信息得到`User`类，可以使用`BeanUtil`转换为`UserVO`（面向输出的实体）
+3. 根据`User`的id在`Address`表中查询对应地址，这时候就使用到DB静态工具类：`Db.lambdaQuery(Address.class).eq(Address::getUserId, id).list();`，在`lambdaQuery`中指定要查询的类，后面跟平时一样接一些等式（`Where`条件），`.list()`表示返回列表
+4. 得到`Address`列表后，使用`BeanUtil`将列表转换为`AddressVO`，并将这个地址属性设置到`UserVO`中去
+5. 返回`UserVO`
+
+## 6.3 案例二：给定批量用户ids，查询这一些用户的信息及用户地址
+对应于`service/impl/UserServiceImpl.java`下的`queryBatchUserAndAddressByIds`方法
+
+步骤：
+1. 根据`ids`查询用户信息得到列表`users`：`baseMapper.selectBatchIds(ids)`，将`users`使用`BeanUtil`转换为`userVOs`
+2. ！注意条件的判断，此处使用了一个判空，假如用户列表为空的话，直接返回空
+3. 将`users`的`ids`批量提取出来得到`userIds`，这里使用到了`collections`的方法：`users.stream().map(User::getId).collect(Collectors.toList());`
+4. 使用`in`语句在`Address`表中批量查询用户的地址信息，并使用`BeanUril`转换得到地址列表`addressVOList`
+5. `addressVOList`的结果不利于我们将信息设置到对应的用户里去，如果能够转成`userId`为K，`addresses`为V的HashMap是最好的，所以再次使用`collections`方法：`addressVOList.stream().collect(Collectors.groupingBy(AddressVO::getUserId));`
+6. 使用`forEach`遍历`userVOs`，将每一个`userId`对应的`AddressVO`设置到`userVO`中
+7. 返回`userVOs`
+
+# 7. 逻辑删除
+对于⼀些⽐较重要的数据，我们往往会采⽤逻辑删除的⽅案：
+- 在表中添加⼀个字段标记数据是否被删除
+- 当删除数据时把标记置为true
+- 查询时过滤掉标记为true的数据
+
+MP支持逻辑删除，只需要在`application.yml`中配置逻辑删除字段：
+```yaml
+mybatis-plus:
+  global-config:
+    db-config:
+      logic-delete-field: deleted # 配置逻辑删除字段
+      logic-delete-value: 1
+      logic-not-delete-value: 0
+```
+配置完逻辑删除字段后，之后执行删除操作都会变成`update`，执行查询操作都会额外加上条件`AND 删除字段=未删除标记`
+
+# 8. 枚举处理器
+在`User`中有一个`UserStatus`状态，在表中是0和1，但是编码时候一直`set`为0/1，或者`get`为0/1会导致意义不明的情况，导致代码可读性降低
+
+所以这里将`UserStatus`处理成一个枚举类型：
+```java
+package com.itheima.mp.enums;
+
+import com.baomidou.mybatisplus.annotation.EnumValue;
+import com.fasterxml.jackson.annotation.JsonValue;
+import lombok.Getter;
+
+@Getter
+public enum UserStatus {
+    NORMAL(1, "正常"),
+    FROZEN(2, "冻结")
+    ;
+
+    @EnumValue // 此注解指明哪个值对应数据库中的值
+    private final int value;
+    @JsonValue // 该注解加在哪个属性上边，未来返回的时候就会显示哪个属性
+    private final String desc;
+
+    UserStatus(int value, String desc) {
+        this.value = value;
+        this.desc = desc;
+    }
+}
+```
+注意，使用这种枚举处理还要在yaml中配置：
+```yaml
+mybatis-plus:
+  configuration:
+    default-enum-type-handler: com.baomidou.mybatisplus.core.handlers.MybatisEnumTypeHandler
+```
+这里代码的核心为：
+1. `@EnumVlue`，这个注解指明清楚哪个字段对应于数据库中的值
+2. `@JsonValue`，表明返回时显示哪个属性的值，若不备注默认显示上边的`NORMAL/FROZEN`，可能导致可读性不强的问题
