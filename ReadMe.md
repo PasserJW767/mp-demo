@@ -1,4 +1,82 @@
 # MyBatis-Plus Demo
+
+## 0. 总结
+**Mapper：**
+1. 对于`Mapper`，`extends BaseMapper<T>`，该泛型T表示对应的类，比如一个Mapper对应于`User`，则`extends BaseMapper<User>`
+2. MP处理T中属性的默认规则：
+   - T的类名可能是驼峰命名法，MP默认将驼峰转成下划线作为表名
+   - T的属性可能是驼峰命名法，MP默认将驼峰转成下划线作为字段名，根据变量类型推测字段类型
+   - MP默认将名为id的字段作为主键
+3. 如果我们的命名不符合MP给定的默认规则，可以使用：
+   - **使用`@TableName`在类上指定具体的表名**
+     - 如`@TableName(value = "tb_user")`
+   - **使用`@TableId`注释在具体的属性上，用于指定具体主键**
+     - 假如属性名称为id，数据库中的字段名称为idd，则使用`@TableId("idd")`进行映射
+     - `@TableId`还支持一个`type`属性，支持的类型如：`AUTO`自增、`INPUT`由输入设置、`ASSIGN_ID`雪花算法随机生成主键值，**默认使用雪花算法**
+   - **使用`@TableField`来指定属性对应的数据库字段值**
+     - 如在`isMarried`字段上标注`@TableField("isMarried")`。
+     - 还有一个`exist`字段用于表名该属性是否为数据库字段，假如标注：`@TableField(exist = False)`，则查询和返回时会忽略该属性
+   - **其他：**
+     - 在yml文件中，通过`mybatis-plus.global-config.db-config.id-type`属性可以设置默认的IdType类型
+4. 简单单表语句的使用（以User表为例）
+   - 插入：`userMapper.insert(user)`
+   - 查询：`userMapper.selectById(id)`
+   - 批量查询：`userMapper.selectBatchIds(ids)`
+   - 更新：`userMapper.updateById(id)`
+   - 删除：`userMapper.deleteById(id)`
+5. 复杂单表语句的使用（以User表为例），需要使用到Wrapper，除了新增外，修改、删除、查询可能都涉及到`ById`外更复杂的情况：
+   - 以`QueryWrapper`为例，`new QuerryWrapper<User>()`来创建wrapper，在后面可以跟：
+     - `select("id", "username", "password)`指定返回字段
+     - `like("username", "o")`<==>`where username like 'o'`
+     - `ge("balance", 100)`<==>`where balance >= 100`
+     - 等等，根据具体条件选择
+     - 通过`List<User> users = userMapper.selectList(wrapper)`获得结果
+   - `QueryWrapper`与`update`结合如下（更新时需要选择对应的用户）：
+     - `new QuerryWrapper<User>().eq("username", "Jack")`，表示查找`username`为`Jack`的人的信息
+     - 设置更新条件为`User user = new User(); user.setBalance(20000);`
+     - 通过`userMapper.update(user, wrapper)`来更新，会自动更新有值的字段
+   - 以`UpdateWrapper`为例，`new UpdateWrapper<User>()`来创建wrapper，在后面可以跟：
+       - `.set("balance = balance - 200)`<==>`SET balance = balance - 200`
+       - `.in("id", ids)`<==>`WHERE id in (1, 2, 4)`
+       - 通过`userMapper.update(null, wrapper)`来更新
+6. LambdaQuery与LambdaUpdate，用法与上面类似，不过上面是通过`("字段名", 值)`来指定的，这样会把字段名写死，假如后期修改了数据库中的字段名，不易于维护，所以Lambda就通过`类名::方法`的形式来表示字段对应的属性，表示获取该属性对应字段的字段名，例如：
+   - `new LambdaUpdateWrapper<User>().in(User::getId, ids)`<==>`WHERE id in (1, 2, 4)`
+7. 自定义SQL：在5中最后将所有用户余额-200的代码中，代码都是写死的，不易于拓展维护，就需要用到自定义SQL，传入减去的`money`，结合`in`语句：
+   - 在业务层定义QueryWrapper：`QueryWrapper<User> wrapper = new QueryWrapper<User>().in("id", ids);` 
+   - 在业务层中调用SQL：`userMapper.deductBalanceByIds(200, wrapper)`
+   - 对应于持久层的函数：`void deductBalanceByIds(@Param("money") int money, @Param("ew") QueryWrapper<User> wrapper);`
+   - 在持久层函数上面定义SQL语句：`@Update("Update user SET balance = balance - #{money} ${ew.customSqlSegment}")`，这里`wrapper`对象必须使用`@Param("ew")`注解，其它参数可以使用自己的名字，`${ew.customSqlSegment}`表示使用前面wrapper定义的查询条件
+8. 多表关联，使用自定义SQL实现
+   - 在持久层定义函数：`List<User> queryUserByWrapper(@Param("ew") QueryWrapper<User> wrapper)`
+   - 在持久层函数上面定义SQL语句：`@Select("SELECT u.* FROM user u INNER JOIN address a ON u.id=a.user_id ${ew.customSqlSegment}")`
+   - 定义Mapper xml文件也差不多：`<select id="queryUserByIdAndAddr" resultType="com.itheima.mp.domain.po.User">SELECT * FROM user u INNER JOIN address a ON u.id = a.user_id ${ew.customSqlSegment}</select>`
+
+**Service：**
+1. 对于Service，接口`IService extends IService<T>`，接口实现类`ServiceImpl extends ServiceImpl<UserMapper, User>`
+2. 基本CRUD：
+   - `save(T)`：新增单个元素
+   - `saveBatch(Collection<T>)`：批量新增
+   - `saveOrUpdate(T)`：新增或修改单个元素
+   - `saveOrUpdateBatch(Collection<T>)`：批量新增或更新
+   - `removeById()`：根据ID删除
+   - `removeByIds()`：根据ID批量删除
+   - `remove(Wrapper<T>)`：根据Wrapper条件删除
+   - `updateById()`：根据ID修改
+   - `update(Wrapper<T>)`：根据Wrapper修改，Wrapper中包括set和where
+   - `update(T, Wrapper<T>)`：按照T来修改Wrapper匹配到的数据
+   - `updateBatchById()`：根据ID批量修改
+   - `getById`：根据ID查询数据
+   - `getOne(Wrapper<T>)`：根据Wrapper查询1条数据
+   - `getBaseMapper`：获取Service内的`BaseMapper`实现，某些时候需直接调用Mapper内的自定义SQL时可以用到这个方法获取Mapper
+   - `listByIds()`：根据id批量查询 
+   - `list(Wrapper<T>)`：根据Wrapper条件查询多条数据
+   - `list()`：查询所有
+   - `count()`：统计数量
+3. 在基于Lambda的查询中：
+   - `.one()`：最多1个结果
+   - `.list()`：返回集合结果
+   - `.count()`：返回计数结果
+
 ## 1. MyBatis-Plus的使用
 在`src/main/java/com/itheima/mp/mapper/UserMapper.java`下，使类继承`BaseMapper<User>`，就可以使用常见的一些语句
 
@@ -45,7 +123,7 @@ User::getBalance
 
 在自己自定义的语句中通过`@Param("ew")`来指明wrapper对象（这个是固定的！），通过其他名字来指定传入的参数
 
-## 4.1 自定义Sql用于多表查询
+### 4.1 自定义Sql用于多表查询
 
 见`src/test/java/com/itheima/mp/MpDemoApplicationTests.java`下的`testQueryMultiTable`
 
@@ -64,18 +142,18 @@ LambdaQueryWrapper<User> userLambdaQueryWrapper = new QueryWrapper<User>()
         .lambda();
 ```
 
-# 5. IService接口
-## 5.1 IService接口的使用
+## 5. IService接口
+### 5.1 IService接口的使用
 在`src/main/java/com/itheima/mp/service/IUserService.java`接口下继承IService
 
 在`src/main/java/com/itheima/mp/service/impl/UserServiceImpl.java`下继承ServiceImpl<UserMapper, User>，其中第一个类是Mapper类，第二个是对应的实体类，这个类里边实现了IService要求的许多方法，接着实现IUserService
 
 测试CRUD见`src/test/java/com/itheima/mp/service/UserServiceTest.java`
 
-## 5.2 IService做简单业务开发
+### 5.2 IService做简单业务开发
 在Controller做基础业务开发见`src/main/java/com/itheima/mp/controller/UserController.java`
 
-## 5.3 IService做复杂业务开发
+### 5.3 IService做复杂业务开发
 在Controller做复杂业务开发见`src/main/java/com/itheima/mp/controller/UserController.java`下的`deductBalance`
 
 在这部分中主要就是在业务层对用户合法性进行校验，并对余额进行检查
@@ -86,7 +164,7 @@ LambdaQueryWrapper<User> userLambdaQueryWrapper = new QueryWrapper<User>()
 1. 请求参数如果是单个参数不可以使用`@RequestParam`，否则会报错无法解析条件的问题：`Required request parameter 'id' for method parameter type long is not presen...`
 2. 使用swapper时记得将参数勾选上，如果勾选上提示`Request method 'PUT' not supported`的话，可以检查前后端的请求和规定链接是否一致
 
-## 5.4 IService的Lambda方法
+### 5.4 IService的Lambda方法
 在`src/main/java/com/itheima/mp/controller/UserController.java`下的复杂条件查询方法`queryUsers`就使用了Lambda查询
 
 同时在`src/main/java/com/itheima/mp/service/impl/UserServiceImpl.java`中的`deductMoney`也给出了更新余额的Lambda实现形式，
@@ -99,7 +177,7 @@ lambda适用于一些原本需要再Mapper.xml中写的一些判断语句，如�
 </if>
 ```
 
-## 5.5 IService中的批量新增
+### 5.5 IService中的批量新增
 做批量新增的三种方案：
 1. 普通for循环逐条插入，速度很慢，不推荐（因为一条语句要发送一个网络请求）
 2. MP的批量新增，基于预编译的批处理，性能不错（MP会将所有的插入请求打包起来，比如1000条打包一份，一次网络请求发送1000条插入语句）
@@ -142,8 +220,8 @@ void testsaveOneByone(){
 
 在第二种方案的基础上只需要在`application.yml`后拼接一个参数：`rewriteBatchedStatements=True`即可。
 
-# 6. DB静态工具
-## 6.1 为什么需要DB静态工具？
+## 6. DB静态工具
+### 6.1 为什么需要DB静态工具？
 思考一个场景：查询用户时，我们需要同时返回用户的地址信息
 
 在这种情况下，我们可能还需要在`UserService`业务类中额外地加入如`AddressService`或者`AddressMapper`等`User`无关的内容，
@@ -151,7 +229,7 @@ void testsaveOneByone(){
 
 虽然Spring能够处理好循环依赖，但是我们应当尽量避免循环依赖的出现，这时候就需要使用DB静态工具
 
-## 6.2 案例一：给定用户id，查询用户时同时查询用户地址
+### 6.2 案例一：给定用户id，查询用户时同时查询用户地址
 对应于`service/impl/UserServiceImpl.java`下的`queryUserAndAddressById`方法
 
 步骤：
@@ -173,7 +251,7 @@ void testsaveOneByone(){
 6. 使用`forEach`遍历`userVOs`，将每一个`userId`对应的`AddressVO`设置到`userVO`中
 7. 返回`userVOs`
 
-# 7. 逻辑删除
+## 7. 逻辑删除
 对于⼀些⽐较重要的数据，我们往往会采⽤逻辑删除的⽅案：
 - 在表中添加⼀个字段标记数据是否被删除
 - 当删除数据时把标记置为true
@@ -190,7 +268,7 @@ mybatis-plus:
 ```
 配置完逻辑删除字段后，之后执行删除操作都会变成`update`，执行查询操作都会额外加上条件`AND 删除字段=未删除标记`
 
-# 8. 枚举处理器
+## 8. 枚举处理器
 在`User`中有一个`UserStatus`状态，在表中是0和1，但是编码时候一直`set`为0/1，或者`get`为0/1会导致意义不明的情况，导致代码可读性降低
 
 所以这里将`UserStatus`处理成一个枚举类型：
@@ -228,7 +306,7 @@ mybatis-plus:
 1. `@EnumVlue`，这个注解指明清楚哪个字段对应于数据库中的值
 2. `@JsonValue`，表明返回时显示哪个属性的值，若不备注默认显示上边的`NORMAL/FROZEN`，可能导致可读性不强的问题
 
-# 9. JSON处理器
+## 9. JSON处理器
 在数据库表中，`User`有一个`info`属性，里面是以Json格式保存了用户的`age&intro&gender`信息，目前是以字符串的形式处理的
 
 如果给用户返回这样的格式可能不易于读取和理解
@@ -237,11 +315,11 @@ mybatis-plus:
 1. 新建一个JSON格式对应的实体，如`domain/po/UserInfo`
 2. 在原本的`User`实体上对应的字段加上处理器，并在类上允许自动映射，见`domain/po/User`
 
-# 10. MP提供的分页插件
-## 10.1 分页查询配置
+## 10. MP提供的分页插件
+### 10.1 分页查询配置
 见`config/MyBatisConfig.java`，里面的核心实际上是注册了一个拦截器，在MyBatis执行SQL语句查询的时候进行拦截并进行分页处理
 
-## 10.2 分页测试
+### 10.2 分页测试
 见`test/.../service/UserServiceTest.java`中的`testPageQuery`方法，步骤分为：
 1. 准备分页插件，这个过程需要指定查询的页数`pageNo`和每一页的大小`pageSize`
 2. 指定具体排序条件，按什么字段进行排序
@@ -251,7 +329,7 @@ mybatis-plus:
     - `p.getPages`：查询总页数
     - `p.getRecords`：拿到刚才指定`pageNo`那一页的结果
 
-## 10.3 分页案例
+### 10.3 分页案例
 ![pic1.png](assets/pic1.png)
 
 之前已经定义过了一个让用户选择对应条件进行查询的类，即`domain/query/UserQuery`
@@ -280,10 +358,10 @@ mybatis-plus:
 5. 建立返回的类型`PageDTO<UserVO>`对象，并将`Page<User>`中的一些`total&page`属性设置进去
 6. 给`PageDTO<UserVO>`set List为`BeanUtil.copyToList(Page<User>.getRecord(), UserVO.class)`
 
-## 10.4 基于分页案例的内容封装
+### 10.4 基于分页案例的内容封装
 在10.3中的代码有很多冗余的片段，有一些是可以提出来作为公共部分的
 
-### 10.4.1 PageQuery的改造
+#### 10.4.1 PageQuery的改造
 比如对于：
 ```java
    // 1. 设置page
@@ -341,7 +419,7 @@ mybatis-plus:
 Page<User> page = query.toMpPageDefaultSortByUpdateTimeDesc();
 ```
 
-### 10.4.2 PageDTO的改造
+#### 10.4.2 PageDTO的改造
 将`Page<User>`转换为`PageDTO<UserVO>`的部分也可以提取出来作为公共方法，写在`domain/dto/PageDTO`下
 ```java
     public static <T, P> PageDTO<T> change(Page<P> p, Class<T> voClass){
@@ -388,7 +466,7 @@ Page<User> page = query.toMpPageDefaultSortByUpdateTimeDesc();
 
 ![pic2.png](assets/pic2.png)
 
-# 11. 敏感参数加密
+## 11. 敏感参数加密
 在`src/test/java/com/itheima/mp/utils/AESGenerate.java`下建立数据库用户名、密码的秘钥
 
 修改yml配置，配置加密后的参数，注意要在加密参数前加上`mpw`参数：

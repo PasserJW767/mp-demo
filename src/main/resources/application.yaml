@@ -21,6 +21,7 @@ mybatis-plus:
       logic-delete-field: deleted # 配置逻辑删除字段
       logic-delete-value: 1
       logic-not-delete-value: 0
+      id-type: assign_id
 knife4j:
   enable: true
   openapi:
