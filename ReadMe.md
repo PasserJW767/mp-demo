@@ -251,7 +251,7 @@ mybatis-plus:
     - `p.getPages`：查询总页数
     - `p.getRecords`：拿到刚才指定`pageNo`那一页的结果
 
-## 10.3 分页案例1
+## 10.3 分页案例
 ![pic1.png](assets/pic1.png)
 
 之前已经定义过了一个让用户选择对应条件进行查询的类，即`domain/query/UserQuery`
@@ -279,3 +279,135 @@ mybatis-plus:
 4. 第三步得到一个`Page<User>`对象，使用`CollUtil`来判空
 5. 建立返回的类型`PageDTO<UserVO>`对象，并将`Page<User>`中的一些`total&page`属性设置进去
 6. 给`PageDTO<UserVO>`set List为`BeanUtil.copyToList(Page<User>.getRecord(), UserVO.class)`
+
+## 10.4 基于分页案例的内容封装
+在10.3中的代码有很多冗余的片段，有一些是可以提出来作为公共部分的
+
+### 10.4.1 PageQuery的改造
+比如对于：
+```java
+   // 1. 设置page
+   // 1.1 设置Page的当前页码和大小
+   Page<User> page = Page.of(query.getPageNo(), query.getPageSize());
+   // 1.2 设置page的排序条件
+   if (query.getSortBy() != null){
+      page.addOrder(new OrderItem(query.getSortBy(), query.getIsAsc()));
+   } else {
+      page.addOrder(new OrderItem("update_time", true));
+   }
+```
+而言，给定`query`，可以直接从`query`返回一个`Page`类型的对象，把这部分的代码抽象到`domain/query/PageQuery.java`中，成为一个方法
+```java
+    public Page<T> toMpPage(){
+//        1. 设置page
+//        1.1 设置Page的当前页码和大小
+        Page<T> page = Page.of(pageNo, pageSize);
+//        1.2 设置page的排序条件
+        if (sortBy != null){
+            page.addOrder(new OrderItem(sortBy, isAsc));
+        } else {
+            page.addOrder(new OrderItem("update_time", true));
+        }
+        return page;
+    }
+```
+但是存在的问题是，可能并不是所有人的默认排序都按照`update_time`，所以可以传入`OrderItem`作为参数：
+```java
+    public Page<T> toMpPage(OrderItem ... orderItems){
+//        1. 设置page
+//        1.1 设置Page的当前页码和大小
+        Page<T> page = Page.of(pageNo, pageSize);
+//        1.2 设置page的排序条件
+        if (sortBy != null){
+            page.addOrder(new OrderItem(sortBy, isAsc));
+        } else {
+            page.addOrder(orderItems);
+        }
+        return page;
+    }
+```
+但是可能有的人就是以`update_time`或者`create_time`作为默认参数，我们也可以为他们提供一些便利的方法：
+```java
+    public Page<T> toMpPageDefaultSortByUpdateTimeDesc(){
+        return toMpPage(new OrderItem("update_time", false));
+    }
+
+    public Page<T> toMpPageDefaultSortByCreateTimeDesc(){
+        return toMpPage(new OrderItem("create_time", false));
+    }
+```
+则此处调用：
+```java
+Page<User> page = query.toMpPageDefaultSortByUpdateTimeDesc();
+```
+
+### 10.4.2 PageDTO的改造
+将`Page<User>`转换为`PageDTO<UserVO>`的部分也可以提取出来作为公共方法，写在`domain/dto/PageDTO`下
+```java
+    public static <T, P> PageDTO<T> change(Page<P> p, Class<T> voClass){
+
+        if (CollUtil.isEmpty(p.getRecords())){
+            return new PageDTO<>(p.getTotal(), p.getPages(), Collections.emptyList());
+        }
+
+        List<T> ts = BeanUtil.copyToList(p.getRecords(), voClass);
+        return new PageDTO<T>(p.getTotal(), p.getPages(), ts);
+    }
+```
+这个转换的问题是，不能由用户指定如何进行转换。由于`User`和`UserVO`的属性都基本相同，所以可以直接通过`BeanUtil`进行转换，但是如果不符合这种条件的，转换方式就应由用户指定
+
+由用户指定转换方法的话，就需要传递一个方法参数，进行转换：
+```java
+    public static <V, P> PageDTO<V> change(Page<P> p, Function<P, V> convertor){
+
+        if (CollUtil.isEmpty(p.getRecords())){
+            return new PageDTO<>(p.getTotal(), p.getPages(), Collections.emptyList());
+        }
+
+        List<V> collect = p.getRecords().stream().map(convertor).collect(Collectors.toList());
+        return new PageDTO<>(p.getTotal(), p.getPages(), collect);
+    }
+```
+这里将`Page`中的记录`records`转换成流(`stream`)，接着通过`convertor`转换参数进行转换，组成list
+
+则此处调用：
+```java
+//        传入BeanUtil的copy属性方法
+        PageDTO<UserVO> userVOPageDTO1 = PageDTO.change(userPage, user -> BeanUtil.copyProperties(user, UserVO.class));
+//        传入自定义的方法，先转换成UserVO，然后隐藏用户名的后两位
+        PageDTO<UserVO> userVOPageDTO2 = PageDTO.change(userPage, user -> {
+            UserVO userVO = BeanUtil.copyProperties(user, UserVO.class);
+            String username = userVO.getUsername();
+            userVO.setUsername(username.substring(0, username.length() - 2) + "**");
+            return userVO;
+        });
+```
+
+
+查询结果如下：
+
+![pic2.png](assets/pic2.png)
+
+# 11. 敏感参数加密
+在`src/test/java/com/itheima/mp/utils/AESGenerate.java`下建立数据库用户名、密码的秘钥
+
+修改yml配置，配置加密后的参数，注意要在加密参数前加上`mpw`参数：
+```yaml
+spring:
+  datasource:
+    url: jdbc:mysql://127.0.0.1:3306/mp?useUnicode=true&characterEncoding=UTF-8&autoReconnect=true&serverTimezone=Asia/Shanghai&rewriteBatchedStatements=True
+    driver-class-name: com.mysql.cj.jdbc.Driver
+#    username: root
+#    password: 123456
+    username: mpw:Wsc8qwu6CBxO3z7lzsuHJA== # 密文要以mpw开头
+    password: mpw:q7QyW25th27ae2RandRZ/Q== # 密文要以mpw开头
+```
+
+启动类需要设置秘钥，要不然连接不上数据库：
+![pic2.png](assets/pic3.png)
+
+对于测试类，配置`args`参数：
+```java
+@SpringBootTest(args = "--mpw.key=a83ceffd3b3300c1")
+```
+如`src/main/java/com/itheima/mp/service/impl/UserServiceImpl.java`中的启动类配置所示

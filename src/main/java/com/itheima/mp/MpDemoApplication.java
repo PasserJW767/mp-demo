@@ -5,7 +5,7 @@ import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
 
 @MapperScan("com.itheima.mp.mapper")
-@SpringBootApplication
+@SpringBootApplication()
 public class MpDemoApplication {
 
     public static void main(String[] args) {

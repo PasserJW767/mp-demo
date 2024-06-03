@@ -13,7 +13,7 @@ import org.springframework.boot.test.context.SpringBootTest;
 import java.time.LocalDateTime;
 import java.util.List;
 
-@SpringBootTest
+@SpringBootTest(args = "--mpw.key=a83ceffd3b3300c1")
 public class UserServiceTest {
 
     @Autowired

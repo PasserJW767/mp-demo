@@ -116,16 +116,16 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements IU
 
     @Override
     public PageDTO<UserVO> queryUserPage(UserQuery query) {
-
-//        1. 设置page
-//        1.1 设置Page的当前页码和大小
-        Page<User> page = Page.of(query.getPageNo(), query.getPageSize());
-//        1.2 设置page的排序条件
-        if (query.getSortBy() != null){
-            page.addOrder(new OrderItem(query.getSortBy(), query.getIsAsc()));
-        } else {
-            page.addOrder(new OrderItem("update_time", true));
-        }
+////        1. 设置page
+////        1.1 设置Page的当前页码和大小
+//        Page<User> page = Page.of(query.getPageNo(), query.getPageSize());
+////        1.2 设置page的排序条件
+//        if (query.getSortBy() != null){
+//            page.addOrder(new OrderItem(query.getSortBy(), query.getIsAsc()));
+//        } else {
+//            page.addOrder(new OrderItem("update_time", false));
+//        }
+        Page<User> page = query.toMpPageDefaultSortByUpdateTimeDesc();
 
 //        2. 根据page进行查询
         Page<User> userPage = lambdaQuery()
@@ -135,17 +135,27 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements IU
                 .lt(query.getMaxBalance() != null, User::getBalance, query.getMaxBalance())
                 .page(page);
 
-//        2-3 判空操作，容易漏掉，注意执行判空！但是感觉判断不判断好像差不多……
-        if (CollUtil.isEmpty(userPage.getRecords())){
-            return new PageDTO<>(userPage.getTotal(), userPage.getPages(), Collections.emptyList());
-        }
+////        2-3 判空操作，容易漏掉，注意执行判空！但是感觉判断不判断好像差不多……
+//        if (CollUtil.isEmpty(userPage.getRecords())){
+//            return new PageDTO<>(userPage.getTotal(), userPage.getPages(), Collections.emptyList());
+//        }
+//
+////        3. 查询出了User信息后，给返回值设置这些信息
+//        PageDTO<UserVO> userVOPage = new PageDTO<>();
+//        userVOPage.setTotal(userPage.getTotal());
+//        userVOPage.setPages(userPage.getPages());
+//
+//        userVOPage.setList(BeanUtil.copyToList(userPage.getRecords(), UserVO.class));
 
-//        3. 查询出了User信息后，给返回值设置这些信息
-        PageDTO<UserVO> userVOPage = new PageDTO<>();
-        userVOPage.setTotal(userPage.getTotal());
-        userVOPage.setPages(userPage.getPages());
-
-        userVOPage.setList(BeanUtil.copyToList(userPage.getRecords(), UserVO.class));
-        return userVOPage;
+//        传入BeanUtil的copy属性方法
+        PageDTO<UserVO> userVOPageDTO1 = PageDTO.change(userPage, user -> BeanUtil.copyProperties(user, UserVO.class));
+//        传入自定义的方法，先转换成UserVO，然后隐藏用户名的后两位
+        PageDTO<UserVO> userVOPageDTO2 = PageDTO.change(userPage, user -> {
+            UserVO userVO = BeanUtil.copyProperties(user, UserVO.class);
+            String username = userVO.getUsername();
+            userVO.setUsername(username.substring(0, username.length() - 2) + "**");
+            return userVO;
+        });
+        return userVOPageDTO2;
     }
 }
